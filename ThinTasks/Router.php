@@ -33,16 +33,16 @@ class Router {
     {
         $args = self::get_arg_info($args);
         $dir = $this->tasks_directory;
-        $file = self::get_best_match($args, function($potential_match) use ($dir) {
+        $match = self::get_best_match($args, function($potential_match) use ($dir) {
             return file_exists($dir.DIRECTORY_SEPARATOR.$potential_match.'.php');
         });
 
-        $args = array_slice($args, count(explode(DIRECTORY_SEPARATOR, $file)));
+        $args->positional = array_slice($args->positional, $match['count']);
 
-        if ($file === null) {
+        if ($match === null) {
             throw new CommandNotFoundException();
         } else {
-            $task = self::get_class_from_path($file);
+            $task = self::get_class_from_path($dir.DIRECTORY_SEPARATOR.$match['path'].'.php');
             $task->thintasks_route($args);
         }
     }
@@ -85,8 +85,8 @@ class Router {
      */
     private static function get_best_match($arguments, $match_function)
     {
-        foreach (self::get_potential_matches($arguments) as $match) {
-            if ($match_function($match)) {
+        foreach (self::get_potential_matches($arguments->positional) as $match) {
+            if ($match_function($match['path'])) {
                 return $match;
             }
         }
@@ -102,11 +102,17 @@ class Router {
      */
     private static function get_potential_matches($arguments)
     {
-        $potential_matches = [implode(DIRECTORY_SEPARATOR, $arguments) . DIRECTORY_SEPARATOR . self::default_file_name];
+        if (count($arguments) === 0) {
+            return [['path' => self::default_file_name, 'count' => 0]];
+        }
+
+        $potential_matches = [['path' => implode(DIRECTORY_SEPARATOR, $arguments) . DIRECTORY_SEPARATOR . self::default_file_name,
+                               'count' => count($arguments)]];
         do {
-            $potential_matches[] = implode(DIRECTORY_SEPARATOR, $arguments);
+            $potential_matches[] = ['path' => implode(DIRECTORY_SEPARATOR, $arguments), 'count' => count($arguments)];
             array_pop($arguments);
-            $potential_matches[] = implode(DIRECTORY_SEPARATOR, array_merge($arguments, [self::default_file_name]));
+            $potential_matches[] = ['path' => implode(DIRECTORY_SEPARATOR, array_merge($arguments, [self::default_file_name])),
+                                    'count' => count($arguments)];
         } while (count($arguments) > 0);
 
         return $potential_matches;
@@ -127,7 +133,7 @@ class Router {
             }
 
             $class_info = static::get_class_info_from_path($path);
-            $class_name = implode('\\', [$class_info->namespace, $controller_info->class]);
+            $class_name = implode('\\', [$class_info->namespace, $class_info->class]);
 
             return new $class_name();
         } else {

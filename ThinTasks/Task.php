@@ -34,4 +34,28 @@ trait Task {
         $reflection = new \ReflectionMethod($this, $name);
         return $reflection->isPublic() && $reflection->getNumberOfParameters() <= count($args);
     }
+
+    protected function needs()
+    {
+        $missing_args = [];
+        foreach (func_get_args() as $arg) {
+            if (!isset($this->args->keyword[$arg])) {
+                $missing_args[] = $arg;
+            }
+        }
+
+        if (count($missing_args) > 0) {
+            echo "The following paramaters were required but missing:\n";
+            foreach ($missing_args as $arg) {
+                echo "  * " . $arg . "\n";
+            }
+
+            exit;
+        }
+    }
+
+    protected function kw($name)
+    {
+        return isset($this->args->keyword[$name]) ? $this->args->keyword[$name] : false;
+    }
 }
